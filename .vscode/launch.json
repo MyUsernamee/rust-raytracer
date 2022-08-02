@@ -25,6 +25,25 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Run executable 'Raytracer' in Release mode",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--release",
+                    "--bin=Raytracer",
+                    "--package=Raytracer"
+                ],
+                "filter": {
+                    "name": "Raytracer",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'Raytracer'",
             "cargo": {
                 "args": [

@@ -1,42 +1,63 @@
 mod intersections;
+mod object;
+mod renderer;
 
-use image::ImageBuffer;
+use std::{fs::File, io::Write, f64::consts::TAU};
+
+use cgmath::{Matrix4, Vector3, Point3, InnerSpace, Matrix3, Matrix, Transform};
+use image::{ImageBuffer, GenericImageView, codecs::{png::FilterType, gif::{GifEncoder, Repeat}}, Rgb, RgbaImage, Frame, DynamicImage, Delay, Rgba};
 use intersections::*;
-use nalgebra::Vector3;
+use object::{IntersectableObject, ObjectType, intersect_objects, Material};
+use rayon::iter::ParallelBridge;
+use renderer::{Camera, render};
+
+const frame_count: usize = 20;
 
 fn main() {
 
-    let mut img = ImageBuffer::new(2048, 2048);
-    let dimensions = img.dimensions();
+    let mut camera_position = Vector3::new(0.0, 0.5, -2.5);
+    let mut camera_direction = Vector3::new(0.0, 0.0, 1.0);
 
-    for (x, y, pixel) in img.enumerate_pixels_mut() {
-        
-        let direction = Vector3::new(x as f64 / dimensions.0 as f64 - 0.5, 0.5 - y as f64 / dimensions.1 as f64, 1.0);
-        let starting_position = Vector3::new(0.0, 0.0, 0.0);
+    let mut objects: Vec<IntersectableObject> = Vec::new();
+    objects.push(IntersectableObject {
+        object_type: ObjectType::Plane { position: Vector3::new(0.0, -1.0, 0.0), normal: Vector3::new(0.0, 1.0, 0.0) },
+        material: Material::new(Vector3::new(1.0, 1.0, 1.0), 1.0),
+    });
+    objects.push(IntersectableObject {
+        object_type: ObjectType::Sphere { position: Vector3::new(0.0, 1.0, -2.0), radius: 0.1 },
+        material: Material::new(Vector3::new(1.0, 1.0, 1.0) * 100., 1.0),
+    });
+    objects.push(IntersectableObject {
+        object_type: ObjectType::Sphere { position: Vector3::new(0.0, 0.0, 0.0), radius: 0.5 },
+        material: Material::new(Vector3::new(1.0, 1.0, 1.0), 0.001),
+    });
+    let mut frames : Vec<Frame> = Vec::new();
 
-        let intersection = intersect_sphere(starting_position, direction, Vector3::new(0.0, 0.0, 4.0), 1.0);
-        let plane_intersection = intersect_plane(starting_position, direction, Vector3::new(0.0, 0.0, 10.0), Vector3::new(0.0, 0.0, -1.0));
+    for image in 0..frame_count {
+    
+        let img = render(&Camera {
+            position: camera_position,
+            direction: camera_direction,
+            fov: 0.5,
+            aspect_ratio: 1.0,
+            resolution: (512, 512),
+            
+        }, &objects, 16, 4);
 
-        if let Some(intersection) = intersection {
-            let mut color = Vector3::new(255.0, 0.0, 0.0) * intersection.normal.dot(&Vector3::new(1.0, 1.0, -1.0).normalize());
-            color.x = (if plane_intersection.is_some() && plane_intersection.unwrap().distance < intersection.distance {
-                255.0
-            } else {
-                color.x
-            }) as f64;
-            *pixel = image::Rgb([color.x as u8, color.y as u8, color.z as u8]);
-        } else {
-            let mut color = Vector3::new(0.0, 0.0, 0.0);
-            color.x = (if plane_intersection.is_some() {
-                255.0
-            } else {
-                color.x
-            }) as f64;
-            *pixel = image::Rgb([color.x as u8, color.y as u8, color.z as u8]);
-        }
+        // Change it to a RgbaImage.
+        let mut img = DynamicImage::from(img);
+        let mut img = img.to_rgba8();
+
+        frames.push(Frame::from_parts(img, 0, 0, Delay::from_numer_denom_ms(1000, frame_count as u32)));
+
+        println!("Rendered frame {}", image);
 
     }
 
-    img.save("test.png").unwrap();
+    let mut file = File::create("animation.gif").unwrap();
+    let mut animation = GifEncoder::new(file);
+    animation.set_repeat(Repeat::Infinite);
+    animation.encode_frames(frames);
+
 
 }
