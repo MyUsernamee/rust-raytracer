@@ -1,6 +1,6 @@
 use cgmath::{Vector3, InnerSpace};
 
-
+#[derive(Debug, Clone, PartialEq)]
 pub struct Intersection {
 
     pub starting_position: Vector3<f64>,
@@ -8,6 +8,7 @@ pub struct Intersection {
     pub intersection_position: Vector3<f64>,
     pub normal: Vector3<f64>,
     pub distance: f64,
+    pub exit_distance: f64,
 
 }
 
@@ -23,22 +24,22 @@ pub fn intersect_sphere(starting_position: Vector3<f64>, starting_direction: Vec
     }
 
     let c = ((sphere_radius * sphere_radius) - b).sqrt(); // We use the distance as the sphere as one leg of a triangle and the hypotenuse of the triangle is the radius of the sphere.
-    let t = {
-
-        if a - c > a + c {
-            a + c
-        } else {
-            a - c
-        }
-
-    }; // Move the projection back to be sitting on the surface of the sphere.
+    let mut t = a - c; // The distance from the starting position to the intersection point
+    let mut t2 = a + c; // The distance from the starting position to the exit point
+    let mut inside_sphere = false;
+    
+    if t > t2 { // If t2 is closer, swap them
+        let t_temp = t.clone();
+        t = t2;
+        t2 = t_temp;
+    }
 
     if t < 0.0 { // Dang rounding errors...
         return None;
     }
 
     let intersection_position = starting_position + direction * (t);
-    let normal = (intersection_position - sphere_position).normalize();
+    let normal = (intersection_position - sphere_position).normalize() * (if inside_sphere { -1.0 } else { 1.0 });
     let intersection_position = intersection_position + normal * 0.001; // Move the intersection point a little bit away from the sphere to avoid self-intersections.
 
     Some(Intersection {
@@ -47,6 +48,7 @@ pub fn intersect_sphere(starting_position: Vector3<f64>, starting_direction: Vec
         intersection_position: intersection_position,
         normal: normal,
         distance: t,
+        exit_distance: t2,
     })
 
 }
@@ -70,6 +72,7 @@ pub fn intersect_plane(starting_position: Vector3<f64>, starting_direction: Vect
         intersection_position: intersection_position,
         normal: normal,
         distance: distance,
+        exit_distance: distance, // A plane is only one sided.
     })
     
 
